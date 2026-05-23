@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CF Cool Graphs</title>
+  <meta name="description" content="Interactive graphs and performance visualization for Codeforces competitive programming profiles. Track rating, solve trends, and skill progression.">
+  <!-- Google Fonts: Open Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Chart.js Zoom Plugin (requires Hammer.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0"></script>
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo">
+        <i class="fa-solid fa-chart-line logo-icon"></i>
+        <h1>CF<span> Cool Graphs</span></h1>
+      </div>
+      <p class="subtitle">Codeforces profile visualization and statistics dashboard</p>
+    </header>
+
+    <!-- Search Section -->
+    <section class="search-section">
+      <form id="search-form" class="search-form">
+        <div class="input-wrapper">
+          <i class="fa-regular fa-user input-icon"></i>
+          <input 
+            type="text" 
+            id="handle-input" 
+            placeholder="Enter Codeforces Handle (e.g. tourist, Benq, Egor)" 
+            required 
+            autocomplete="off"
+            spellcheck="false"
+          >
+        </div>
+        <div class="btn-group">
+          <button type="submit" id="search-btn" class="btn btn-primary">
+            <span class="btn-text">Analyze</span>
+            <span class="btn-loader"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
+          </button>
+          <button type="button" id="refresh-btn" class="btn btn-secondary" title="Force Refresh Cache" disabled>
+            <i class="fa-solid fa-rotate"></i>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Notification Banners -->
+    <div id="error-banner" class="banner banner-error hidden">
+      <i class="fa-solid fa-circle-exclamation banner-icon"></i>
+      <span id="error-message">User not found.</span>
+      <button class="banner-close" onclick="document.getElementById('error-banner').classList.add('hidden')">&times;</button>
+    </div>
+    
+    <div id="info-banner" class="banner banner-info hidden">
+      <i class="fa-solid fa-circle-info banner-icon"></i>
+      <span id="info-message">Serving data from cache.</span>
+    </div>
+
+    <!-- Main Dashboard Workspace -->
+    <main id="dashboard" class="dashboard-grid hidden">
+      
+      <!-- Left Column: Sidebar -->
+      <aside class="sidebar-column">
+        <!-- Profile Card Summary -->
+        <section class="profile-card card">
+          <div class="profile-header">
+            <img id="user-avatar" src="" alt="User Avatar" class="user-avatar">
+            <div class="profile-title">
+              <h2 id="user-handle">Handle</h2>
+              <div id="user-rank" class="rank-badge">Rank</div>
+            </div>
+          </div>
+          <div class="profile-details">
+            <div class="metric-item">
+              <span class="metric-label">Current Rating</span>
+              <span id="user-rating" class="metric-value">1500</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Max Rating</span>
+              <span id="user-max-rating" class="metric-value">1600</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Max Rank</span>
+              <span id="user-max-rank" class="metric-value">Expert</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Solved Problems</span>
+              <span id="user-total-solved" class="metric-value">1234</span>
+            </div>
+            <div class="metric-item full-width" id="org-container">
+              <span class="metric-label">Organization</span>
+              <span id="user-org" class="metric-value">Not Specified</span>
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <!-- Right Column: Charts Area -->
+      <div class="charts-column">
+        <!-- Tab Navigation Bar: Main + Misc -->
+        <nav class="charts-nav full-row">
+          <div class="tab-group">
+            <span class="tab-group-label">Main</span>
+            <div class="tab-group-tabs">
+              <button class="nav-tab active" data-tab="rating-overlay"><i class="fa-solid fa-star"></i> Rating Dynamics</button>
+              <button class="nav-tab" data-tab="performance"><i class="fa-solid fa-bolt"></i> Performance</button>
+              <button class="nav-tab" data-tab="rolling-50"><i class="fa-solid fa-chart-line"></i> Rolling Average</button>
+              <button class="nav-tab" data-tab="tag-15"><i class="fa-solid fa-tags"></i> Tag Specific</button>
+              <button class="nav-tab" data-tab="rating-buckets"><i class="fa-solid fa-cubes"></i> Rating Buckets</button>
+              <button class="nav-tab" data-tab="tag-weakness"><i class="fa-solid fa-skull-crossbones"></i> Weakness Map</button>
+              <button class="nav-tab" data-tab="cumulative"><i class="fa-solid fa-award"></i> Solved Progress</button>
+            </div>
+          </div>
+          <div class="tab-group">
+            <span class="tab-group-label">Misc</span>
+            <div class="tab-group-tabs">
+              <button class="nav-tab" data-tab="tags-ac"><i class="fa-solid fa-tag"></i> Solved Tags</button>
+              <button class="nav-tab" data-tab="tags-error"><i class="fa-solid fa-triangle-exclamation"></i> Tag Verdicts</button>
+              <button class="nav-tab" data-tab="heatmap"><i class="fa-solid fa-calendar-days"></i> Heatmap</button>
+              <button class="nav-tab" data-tab="avg-time"><i class="fa-solid fa-clock"></i> Solve Time</button>
+              <button class="nav-tab" data-tab="activity-time"><i class="fa-solid fa-hourglass-half"></i> Activity</button>
+              <button class="nav-tab" data-tab="attempts"><i class="fa-solid fa-circle-question"></i> Verdicts</button>
+              <button class="nav-tab" data-tab="upsolve-tracker"><i class="fa-solid fa-stairs"></i> Upsolve</button>
+            </div>
+          </div>
+        </nav>
+
+        <!-- ==================== MAIN CHARTS ==================== -->
+
+        <!-- Chart 1: Rating Overlay (Rating & Max Solved Difficulty) -->
+        <section id="card-rating-overlay" class="chart-card card full-row">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-star"></i> Rating & Max Solved Difficulty</h3>
+            <div class="card-header-actions">
+              <button class="reset-zoom-btn" title="Reset Zoom"><i class="fa-solid fa-magnifying-glass-minus"></i> Reset Zoom</button>
+              <span class="card-tooltip" title="Official rating changes over time with maximum difficulty rating of solved problems from each contest as scatter overlay.">Rating Dynamics</span>
+            </div>
+          </div>
+          <div class="chart-wrapper" id="rating-overlay-wrapper">
+            <canvas id="ratingOverlayChart"></canvas>
+            <div id="rating-overlay-placeholder" class="chart-placeholder hidden">
+              <i class="fa-solid fa-chart-line placeholder-icon"></i>
+              <p>No contest rating history available.</p>
+              <span class="placeholder-hint">Participate in official contests to view rating dynamics.</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Chart 2: Performance History (Official vs. Virtual) -->
+        <section id="card-performance" class="chart-card card full-row hidden">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-bolt"></i> Performance History (Official vs. Virtual)</h3>
+            <div class="card-header-actions">
+              <button class="reset-zoom-btn" title="Reset Zoom"><i class="fa-solid fa-magnifying-glass-minus"></i> Reset Zoom</button>
+              <span class="card-tooltip" title="Calculated Elo-based performance rating for official and virtual contests. Virtual values are estimated.">Performance Trend</span>
+            </div>
+          </div>
+          
+          <!-- Incremental Loader for Performance -->
+          <div id="perf-calc-card" class="calc-card hidden">
+            <div class="calc-card-header">
+              <h4><i class="fa-solid fa-microchip"></i> Performance Calculation Required</h4>
+              <p>We need to query Codeforces standings for your virtual contests. Due to API rate limits, this will be processed incrementally.</p>
+            </div>
+            <div class="progress-container-wrapper">
+              <div class="progress-bar-container">
+                <div id="perf-progress-fill" class="progress-bar-fill" style="width: 0%"></div>
+              </div>
+              <div class="progress-status">
+                <span id="perf-progress-text">Calculated 0 of 0 contests</span>
+                <button id="start-perf-calc-btn" class="btn btn-primary btn-sm">Calculate Performance</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-wrapper" id="performance-wrapper">
+            <canvas id="performanceChart"></canvas>
+            <div id="performance-placeholder" class="chart-placeholder hidden">
+              <i class="fa-solid fa-award placeholder-icon"></i>
+              <p>No performance calculations available.</p>
+              <span class="placeholder-hint">Calculated performances require contest submissions or rating history.</span>
+            </div>
+          </div>
+          <div class="chart-footer-note">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>Virtual performance is an estimation. It maps your actual overall rank (including unofficial participants) against the ratings of rated participants only. Accuracy is highest in mid-field ranks.</span>
+          </div>
+        </section>
+
+        <!-- Chart 3: 50-Problem Rolling Average -->
+        <section id="card-rolling-50" class="chart-card card full-row hidden">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-chart-line"></i> 50-Problem Rolling Average</h3>
+            <div class="card-header-actions">
+              <button class="reset-zoom-btn" title="Reset Zoom"><i class="fa-solid fa-magnifying-glass-minus"></i> Reset Zoom</button>
+              <span class="card-tooltip" title="Rolling average difficulty rating of the user's solved problems (50 solves window)">Problem Difficulty</span>
+            </div>
+          </div>
+          <div class="chart-wrapper" id="rolling-50-wrapper">
+            <canvas id="rolling50Chart"></canvas>
+            <div id="rolling-50-placeholder" class="chart-placeholder hidden">
+              <i class="fa-solid fa-chart-bar placeholder-icon"></i>
+              <p>Insufficient solves with difficulty ratings to calculate a 50-problem rolling average.</p>
+              <span class="placeholder-hint">Requires 50+ rated unique solves.</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Chart 4: Tag difficulty trends -->
+        <section id="card-tag-15" class="chart-card card full-row hidden">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-tags"></i> Tag Specific (15-Problem Rolling Average)</h3>
+            <div class="card-header-actions">
+              <button class="reset-zoom-btn" title="Reset Zoom"><i class="fa-solid fa-magnifying-glass-minus"></i> Reset Zoom</button>
+              <span class="card-tooltip" title="Rolling average rating for tags with more than 30 unique solved problems (15 solves window)">Tag Specific</span>
+            </div>
+          </div>
+          <div class="chart-wrapper" id="tag-15-wrapper">
+            <canvas id="tag15Chart"></canvas>
+            <div id="tag-15-placeholder" class="chart-placeholder hidden">
+              <i class="fa-solid fa-tag placeholder-icon"></i>
+              <p>No tags have more than 30 unique solves with difficulty ratings.</p>
+              <span class="placeholder-hint">Solve more rated problems in specific tags to unlock category analysis (requires 30+ solves per tag).</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Chart 5: Rating Buckets -->
+        <section id="card-rating-buckets" class="chart-card card full-row hidden">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-cubes"></i> Solved Problems by Rating Buckets</h3>
+            <div class="card-header-actions">
+              <button class="reset-zoom-btn" title="Reset Zoom"><i class="fa-solid fa-magnifying-glass-minus"></i> Reset Zoom</button>
+              <span class="card-tooltip" title="Count of solved problems within specific rating ranges, stacked by participation mode (Contest, Virtual, Practice).">Rating Buckets</span>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="ratingBucketsChart"></canvas>
+          </div>
+        </section>
+
+        <!-- Chart 6: Verdict Breakdown by Rating -->
+        <section id="card-attempts" class="chart-card card full-row hidden">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-circle-question"></i> Verdicts by Rating</h3>
+            <div class="card-header-actions">
+              <button class="reset-zoom-btn" title="Reset Zoom"><i class="fa-solid fa-magnifying-glass-minus"></i> Reset Zoom</button>
+              <span class="card-tooltip" title="Submission verdicts (AC, WA, TLE, MLE, Other) breakdown across rating levels. Only ratings with >=10 attempts are shown.">Verdict Breakdown</span>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="attemptsChart"></canvas>
+          </div>
+        </section>
+
+        <!-- Chart 7: Cumulative Solves -->
+        <section id="card-cumulative" class="chart-card card full-row hidden">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-award"></i> Solved Problems over Time</h3>
+            <div class="card-header-actions">
+              <button class="reset-zoom-btn" title="Reset Zoom"><i class="fa-solid fa-magnifying-glass-minus"></i> Reset Zoom</button>
+              <span class="card-tooltip" title="Total unique solved problems accumulated chronologically">Cumulative</span>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="cumulativeChart"></canvas>
+          </div>
+        </section>
+
+        <!-- ==================== MISC CHARTS ==================== -->
+
+        <!-- Chart 8: Solved Problems by Tag -->
+        <section id="card-tags-ac" class="chart-card card full-row hidden">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-tag"></i> Solved Problems by Tag</h3>
+            <div class="card-header-actions">
+              <button class="reset-zoom-btn" title="Reset Zoom"><i class="fa-solid fa-magnifying-glass-minus"></i> Reset Zoom</button>
+              <span class="card-tooltip" title="Total solved problems by tag, stacked by participation mode (Contest, Virtual, Practice). Top 15 tags shown.">Solved Tags</span>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="tagsAcChart"></canvas>
+          </div>
+        </section>
+
+        <!-- Chart 9: Tag Error Rates & Verdicts -->
+        <section id="card-tags-error" class="chart-card card full-row hidden">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-triangle-exclamation"></i> Tag Error Rates & Verdicts</h3>
+            <div class="card-header-actions">
+              <button class="reset-zoom-btn" title="Reset Zoom"><i class="fa-solid fa-magnifying-glass-minus"></i> Reset Zoom</button>
+              <span class="card-tooltip" title="Verdict percentage breakdown across tags. Sorted by AC rate. Only tags with >=10 attempts are shown (Top 15).">Tag Verdicts</span>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="tagsErrorChart"></canvas>
+          </div>
+        </section>
+
+        <!-- Chart 10: Heatmap -->
+        <section id="card-heatmap" class="chart-card card full-row hidden">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-calendar-days"></i> Solved Problems Heatmap</h3>
+            <span class="card-tooltip" title="Daily maximum problem rating solved shown in a calendar grid (last 1 year).">Heatmap</span>
+          </div>
+          <div class="heatmap-container" id="heatmap-wrapper">
+            <div class="heatmap-scroll-container">
+              <div id="heatmap-grid" class="heatmap-grid"></div>
+            </div>
+            <div class="heatmap-legend">
+              <span>Less</span>
+              <span class="legend-box" style="background-color: #ebedf0;" title="0 solves or 0 rating"></span>
+              <span class="legend-box" style="background-color: #cccccc;" title="< 1200 rating (Newbie)"></span>
+              <span class="legend-box" style="background-color: #008000;" title="1200 - 1399 rating (Pupil)"></span>
+              <span class="legend-box" style="background-color: #03a89e;" title="1400 - 1599 rating (Specialist)"></span>
+              <span class="legend-box" style="background-color: #0000ff;" title="1600 - 1899 rating (Expert)"></span>
+              <span class="legend-box" style="background-color: #aa00aa;" title="1900 - 2099 rating (Candidate Master)"></span>
+              <span class="legend-box" style="background-color: #ff8c00;" title="2100 - 2399 rating (Master)"></span>
+              <span class="legend-box" style="background-color: #ff0000;" title=">= 2400 rating (Grandmaster+)"></span>
+              <span>More</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Chart 11: Average Solve Time vs Difficulty -->
+        <section id="card-avg-time" class="chart-card card full-row hidden">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-clock"></i> Average Solve Time vs Difficulty</h3>
+            <div class="card-header-actions">
+              <button class="reset-zoom-btn" title="Reset Zoom"><i class="fa-solid fa-magnifying-glass-minus"></i> Reset Zoom</button>
+              <span class="card-tooltip" title="Average time taken to solve problems during contest participations mapped against problem difficulty rating.">Solve Speed</span>
+            </div>
+          </div>
+          <div class="chart-wrapper" id="avg-time-wrapper">
+            <canvas id="avgTimeChart"></canvas>
+            <div id="avg-time-placeholder" class="chart-placeholder hidden">
+              <i class="fa-solid fa-clock placeholder-icon"></i>
+              <p>No contest solves available to calculate average solve time.</p>
+              <span class="placeholder-hint">Average solve time is calculated using contest participations only.</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Chart 12: Solve Activity by Hour (Radar/Dodecagon) -->
+        <section id="card-activity-time" class="chart-card card full-row hidden">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-hourglass-half"></i> Solve Activity by Time of Day</h3>
+            <span class="card-tooltip" title="Distribution of accepted solves across hours of the day grouped into 2-hour blocks (Local Time). Displayed as a radar chart.">Activity Profile</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="activityTimeChart"></canvas>
+          </div>
+        </section>
+
+        <!-- Chart 13: Skill Weakness Map -->
+        <section id="card-tag-weakness" class="chart-card card full-row hidden">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-skull-crossbones"></i> Skill Weakness Map</h3>
+            <div class="card-header-actions">
+              <button class="reset-zoom-btn" title="Reset Zoom"><i class="fa-solid fa-magnifying-glass-minus"></i> Reset Zoom</button>
+              <span class="card-tooltip" title="Bubble chart showing tag accuracy vs average difficulty gap. X-axis: Average Difficulty Gap (Problem Rating - User Rating). Y-axis: AC Rate %. Bubble size: Total Attempts. Highlighted quadrant shows high-gap low-accuracy targets.">Weakness Map</span>
+            </div>
+          </div>
+          <div class="chart-wrapper" id="tag-weakness-wrapper">
+            <canvas id="tagWeaknessChart"></canvas>
+            <div id="tag-weakness-placeholder" class="chart-placeholder hidden">
+              <i class="fa-solid fa-skull-crossbones placeholder-icon"></i>
+              <p>Insufficient tag attempts or rating history to map weaknesses.</p>
+              <span class="placeholder-hint">Requires official rating history and at least 5 attempts in at least one tag.</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Chart 14: Upsolve Progression & Backlog -->
+        <section id="card-upsolve-tracker" class="chart-card card full-row hidden">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-stairs"></i> Upsolve Progression & Backlog</h3>
+            <div class="card-header-actions">
+              <button class="reset-zoom-btn" title="Reset Zoom"><i class="fa-solid fa-magnifying-glass-minus"></i> Reset Zoom</button>
+              <span class="card-tooltip" title="Tracks your cumulative upsolved problems over time and lists pending problems to solve.">Upsolve Tracker</span>
+            </div>
+          </div>
+          <div class="chart-wrapper" id="upsolve-tracker-wrapper">
+            <canvas id="upsolveTrackerChart"></canvas>
+            <div id="upsolve-tracker-placeholder" class="chart-placeholder hidden">
+              <i class="fa-solid fa-stairs placeholder-icon"></i>
+              <p>No contest participations with unsolved problems available to track upsolves.</p>
+              <span class="placeholder-hint">Tracks upsolving on your contest problems.</span>
+            </div>
+          </div>
+
+          <!-- Stats Summary Bar -->
+          <div id="upsolve-stats-summary" class="upsolve-stats-container hidden">
+            <div class="upsolve-stat-card">
+              <span class="stat-label">Total Upsolved</span>
+              <span id="upsolve-stat-solved" class="stat-value">0</span>
+            </div>
+            <div class="upsolve-stat-card stat-unsolved">
+              <span class="stat-label">Pending Contests</span>
+              <span id="upsolve-stat-pending" class="stat-value">0</span>
+            </div>
+            <div class="upsolve-stat-card stat-rate">
+              <span class="stat-label">Upsolve Rate</span>
+              <span id="upsolve-stat-rate" class="stat-value">0%</span>
+            </div>
+          </div>
+
+          <!-- Interactive Checklist -->
+          <div id="upsolve-checklist-section" class="upsolve-checklist-container hidden">
+            <div class="upsolve-checklist-header">
+              <h4><i class="fa-solid fa-list-check"></i> Contest Wall Checklist (1 per contest)</h4>
+              <label class="upsolve-filter-toggle">
+                <input type="checkbox" id="upsolve-show-completed" checked>
+                <span>Show completed upsolves</span>
+              </label>
+            </div>
+            <div class="upsolve-table-wrapper">
+              <table class="upsolve-table">
+                <thead>
+                  <tr>
+                    <th class="col-checkbox">Status</th>
+                    <th class="col-contest">Contest</th>
+                    <th>Wall Problem</th>
+                    <th class="col-rating">Difficulty</th>
+                    <th class="col-action">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="upsolve-checklist-table-body">
+                  <!-- Dynamic rows go here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+
+    </main>
+
+    <!-- Loading Skeleton Screen -->
+    <div id="loading-skeleton" class="loading-skeleton hidden">
+      <div class="skeleton-grid">
+        <aside class="sidebar-column">
+          <div class="skeleton-card">
+            <div class="skeleton-avatar shinny"></div>
+            <div class="skeleton-line shinny" style="width: 60%; height: 24px; margin-top: 15px;"></div>
+            <div class="skeleton-line shinny" style="width: 40%; height: 16px; margin-top: 10px;"></div>
+            <div class="skeleton-row" style="margin-top: 30px;">
+              <div class="skeleton-cell"><div class="skeleton-line shinny" style="width: 70%;"></div><div class="skeleton-line shinny" style="width: 40%; height: 20px;"></div></div>
+              <div class="skeleton-cell"><div class="skeleton-line shinny" style="width: 70%;"></div><div class="skeleton-line shinny" style="width: 40%; height: 20px;"></div></div>
+            </div>
+            <div class="skeleton-row">
+              <div class="skeleton-cell"><div class="skeleton-line shinny" style="width: 70%;"></div><div class="skeleton-line shinny" style="width: 40%; height: 20px;"></div></div>
+              <div class="skeleton-cell"><div class="skeleton-line shinny" style="width: 70%;"></div><div class="skeleton-line shinny" style="width: 40%; height: 20px;"></div></div>
+            </div>
+          </div>
+        </aside>
+        
+        <div class="charts-column">
+          <div class="skeleton-card full-row shinny" style="height: 60px; margin-bottom: 0px; border-radius: 6px;"></div>
+          <div class="skeleton-card full-row" style="height: 540px;">
+            <div class="skeleton-title shinny"></div>
+            <div class="skeleton-graph shinny"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State / Landing Page -->
+    <div id="landing-state" class="landing-state">
+      <div class="landing-content">
+        <i class="fa-solid fa-chart-line landing-icon"></i>
+        <h2>CF Cool Graphs</h2>
+        <p>Enter a Codeforces handle to load statistics and interactive graphs:</p>
+        <div class="features-list">
+          <div class="feature-item">
+            <i class="fa-solid fa-chart-line"></i>
+            <span>Rating dynamics & performance histories</span>
+          </div>
+          <div class="feature-item">
+            <i class="fa-solid fa-tags"></i>
+            <span>Rolling solve average & tag difficulty trends</span>
+          </div>
+          <div class="feature-item">
+            <i class="fa-solid fa-cubes"></i>
+            <span>Rating buckets & verdict distributions</span>
+          </div>
+          <div class="feature-item">
+            <i class="fa-solid fa-calendar-days"></i>
+            <span>Activity heatmap & time of day analysis</span>
+          </div>
+          <div class="feature-item">
+            <i class="fa-solid fa-skull-crossbones"></i>
+            <span>Skill weakness mapping & upsolve tracker</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="app-footer">
+    <p>Powered by Codeforces API &bull; Built with HTML5, CSS3 & Chart.js</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+# Dependency directories
+node_modules/
+
+# Local env files (Contains database credentials!)
+.env
+.env.local
+
+# Vercel files
+.vercel
+
+# Scratch/testing files
+scratch/
+verify_api_local.js
+test_cf_local.js
+test_home.js
+
+# IDEs and editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+
+# System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
