@@ -569,7 +569,7 @@ function processActivityTimeData(submissions) {
       const creationTime = sub.creationTimeSeconds;
       if (creationTime && creationTime > 0) {
         const date = new Date(creationTime * 1000);
-        const hour = date.getHours();
+        const hour = date.getUTCHours();
         hourCounts[hour]++;
       }
     }

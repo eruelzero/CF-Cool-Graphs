@@ -1551,11 +1551,16 @@ function renderActivityTimeChart(activityTime) {
     '12–2 PM', '2–4 PM', '4–6 PM', '6–8 PM', '8–10 PM', '10–12 PM'
   ];
   
+  const localOffsetHours = -new Date().getTimezoneOffset() / 60; // Offset in hours (e.g. +8 for UTC+8)
   const blockData = new Array(12).fill(0);
   activityTime.forEach(item => {
-    const hour = item[0];
+    const utcHour = item[0];
     const count = item[1];
-    const blockIndex = Math.floor(hour / 2);
+    // Shift from UTC to user's local timezone
+    const localHour = (utcHour + localOffsetHours + 24) % 24;
+    // Round to nearest integer to handle fractional offsets (like UTC+5.5) cleanly
+    const roundedHour = Math.round(localHour) % 24;
+    const blockIndex = Math.floor(roundedHour / 2);
     blockData[blockIndex] += count;
   });
 
