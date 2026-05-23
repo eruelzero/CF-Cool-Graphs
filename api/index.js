@@ -58,7 +58,8 @@ const userCacheSchema = new mongoose.Schema({
     performance: Number,
     participantType: String, // "OFFICIAL" or "VIRTUAL"
     ratingUpdateTimeSeconds: Number,
-    isDateTaken: Boolean
+    isDateTaken: Boolean,
+    wasFallbackUsed: Boolean
   }],
   totalContestsCount: Number,
   heatmapData: Object,
@@ -389,75 +390,7 @@ function processAttemptsData(submissions) {
   return sortedRatings.map(r => [r, filtered[r]]);
 }
 
-function processAvgTimeData(submissions) {
-  const participations = {};
 
-  for (const sub of submissions) {
-    const author = sub.author;
-    if (!author) continue;
-    const pType = author.participantType;
-    if (!["CONTESTANT", "VIRTUAL", "OUT_OF_COMPETITION"].includes(pType)) {
-      continue;
-    }
-
-    const verdict = sub.verdict;
-    if (verdict === "OK") {
-      const prob = sub.problem;
-      if (!prob) continue;
-      const cid = prob.contestId;
-      const idx = prob.index;
-      if (!cid || !idx) continue;
-      const pid = `${cid}-${idx}`;
-
-      const rating = prob.rating;
-      const timeSecs = sub.relativeTimeSeconds;
-
-      if (rating && timeSecs !== undefined && timeSecs !== null && timeSecs >= 0) {
-        const partKey = `${cid}_${pType}`;
-        if (!participations[partKey]) {
-          participations[partKey] = {};
-        }
-
-        if (!participations[partKey][pid]) {
-          participations[partKey][pid] = { rating, time_secs: timeSecs };
-        } else {
-          participations[partKey][pid].time_secs = Math.min(participations[partKey][pid].time_secs, timeSecs);
-        }
-      }
-    }
-  }
-
-  const buckets = {};
-  for (const partKey in participations) {
-    const probs = Object.values(participations[partKey]);
-    probs.sort((a, b) => a.time_secs - b.time_secs);
-    let lastTime = 0;
-    for (const info of probs) {
-      const r = info.rating;
-      const t = info.time_secs;
-      const timeTaken = t - lastTime;
-      lastTime = t;
-
-      if (!buckets[r]) {
-        buckets[r] = { total_time: 0, count: 0 };
-      }
-      buckets[r].total_time += timeTaken;
-      buckets[r].count += 1;
-    }
-  }
-
-  const results = [];
-  for (const r in buckets) {
-    const d = buckets[r];
-    if (d.count > 0) {
-      const avgTime = d.total_time / d.count;
-      results.push([Number(r), avgTime, d.count]);
-    }
-  }
-
-  results.sort((a, b) => a[0] - b[0]);
-  return results;
-}
 
 function processTagsAcData(submissions, limit = 15) {
   const typePriority = { "CONTESTANT": 3, "OUT_OF_COMPETITION": 3, "VIRTUAL": 2, "PRACTICE": 1 };
@@ -560,6 +493,78 @@ function processTagsErrorData(submissions, limit = 15) {
   filtered.sort((a, b) => getAcRate(b) - getAcRate(a));
 
   return limit !== null ? filtered.slice(0, limit) : filtered;
+}
+
+function processAvgTimeData(submissions) {
+  const participations = {};
+
+  for (const sub of submissions) {
+    const author = sub.author;
+    if (!author) continue;
+    const pType = author.participantType;
+
+    if (!["CONTESTANT", "VIRTUAL", "OUT_OF_COMPETITION"].includes(pType)) {
+      continue;
+    }
+
+    const verdict = sub.verdict;
+    if (verdict === "OK") {
+      const prob = sub.problem;
+      if (!prob) continue;
+      const cid = prob.contestId;
+      const idx = prob.index;
+      if (!cid || !idx) continue;
+      const pid = `${cid}-${idx}`;
+
+      const rating = prob.rating;
+      const timeSecs = sub.relativeTimeSeconds;
+
+      if (rating && timeSecs !== undefined && timeSecs !== null && timeSecs >= 0) {
+        const partKey = `${cid}_${pType}`;
+        if (!participations[partKey]) {
+          participations[partKey] = {};
+        }
+
+        if (!participations[partKey][pid]) {
+          participations[partKey][pid] = { rating: rating, timeSecs: timeSecs };
+        } else {
+          participations[partKey][pid].timeSecs = Math.min(participations[partKey][pid].timeSecs, timeSecs);
+        }
+      }
+    }
+  }
+
+  const buckets = {};
+  for (const partKey in participations) {
+    const probs = Object.values(participations[partKey]);
+    probs.sort((a, b) => a.timeSecs - b.timeSecs);
+    let lastTime = 0;
+    for (const info of probs) {
+      const r = info.rating;
+      const t = info.timeSecs;
+
+      const timeTaken = t - lastTime;
+      lastTime = t;
+
+      if (!buckets[r]) {
+        buckets[r] = { total_time: 0, count: 0 };
+      }
+      buckets[r].total_time += timeTaken;
+      buckets[r].count += 1;
+    }
+  }
+
+  const results = [];
+  for (const r in buckets) {
+    const d = buckets[r];
+    if (d.count > 0) {
+      const avgTime = d.total_time / d.count;
+      results.push([Number(r), avgTime, d.count]);
+    }
+  }
+
+  results.sort((a, b) => a[0] - b[0]);
+  return results;
 }
 
 function processActivityTimeData(submissions) {
@@ -1052,7 +1057,8 @@ async function getAnalysisData(handle, forceRefresh = false, calculatePerformanc
         performance: p.performance,
         participantType: p.participantType,
         ratingUpdateTimeSeconds: isDateTakenVal ? (computedTime || p.ratingUpdateTimeSeconds) : p.ratingUpdateTimeSeconds,
-        isDateTaken: isDateTakenVal
+        isDateTaken: isDateTakenVal,
+        wasFallbackUsed: p.wasFallbackUsed
       };
     }
     return p;
@@ -1065,7 +1071,8 @@ async function getAnalysisData(handle, forceRefresh = false, calculatePerformanc
   const finalPerformancesMap = new Map(validExistingPerformances.map(p => [p.contestId, p]));
   const totalContestsCount = participatedContests.size;
   let newCalculations = 0;
-  const MAX_NEW_CALCULATIONS = 3; // Max 3 per request to respect serverless timeouts
+  let apiCallsMade = 0;
+  const MAX_API_CALLS = 3; // Max 3 delay-inducing API calls per request to respect serverless timeouts
 
   if (calculatePerformances) {
     for (const [contestId, contestInfo] of participatedContests.entries()) {
@@ -1073,7 +1080,7 @@ async function getAnalysisData(handle, forceRefresh = false, calculatePerformanc
         // Keep already calculated performance
         continue;
       }
-      if (newCalculations >= MAX_NEW_CALCULATIONS) {
+      if (apiCallsMade >= MAX_API_CALLS) {
         // Stop calculating to avoid Vercel 10s gateway timeouts. Remaining will calculate on subsequent refreshes.
         break;
       }
@@ -1083,14 +1090,19 @@ async function getAnalysisData(handle, forceRefresh = false, calculatePerformanc
       let contestName = contestInfo.contestName;
       let performance = null;
       let rankSolvedFallbackUsed = false;
+      let wasFallbackUsed = false;
 
       // Fetch virtual rank and start time if not official
       if (rank === null) {
-        console.log(`[Incremental Calc] Fetching and calculating rank for virtual contest ${contestId}...`);
-        await delay(2000);
-        try {
-          const standingsUrl = `https://codeforces.com/api/contest.standings?contestId=${contestId}`;
-          const standingsRes = await axios.get(standingsUrl);
+        if (contestId >= 100000) {
+          console.log(`[Incremental Calc] Gym contest ${contestId} detected. Skipping standings fetch to avoid unauthenticated API error.`);
+        } else {
+          console.log(`[Incremental Calc] Fetching and calculating rank for virtual contest ${contestId}...`);
+          await delay(2000);
+          apiCallsMade++;
+          try {
+            const standingsUrl = `https://codeforces.com/api/contest.standings?contestId=${contestId}`;
+            const standingsRes = await axios.get(standingsUrl);
           if (standingsRes.data.status === "OK") {
             const contest = standingsRes.data.result.contest;
             const problems = standingsRes.data.result.problems;
@@ -1247,6 +1259,7 @@ async function getAnalysisData(handle, forceRefresh = false, calculatePerformanc
           console.error(`[Incremental Calc] Standings calculation failed for contest ${contestId}:`, err.message);
         }
       }
+    }
 
       if (rank === null || rank === 0) {
         console.log(`[Incremental Calc] Rank is null/0 for contest ${contestId}. Using approximate fallback...`);
@@ -1270,6 +1283,7 @@ async function getAnalysisData(handle, forceRefresh = false, calculatePerformanc
         if (ratingsPool.length === 0) {
           console.log(`[Incremental Calc] Fetching ratingChanges for contest ${contestId}...`);
           await delay(2000);
+          apiCallsMade++;
           try {
             const ratingsUrl = `https://codeforces.com/api/contest.ratingChanges?contestId=${contestId}`;
             const ratingsRes = await axios.get(ratingsUrl);
@@ -1312,6 +1326,7 @@ async function getAnalysisData(handle, forceRefresh = false, calculatePerformanc
 
       // Fallback approximate calculation if ratings pool could not be retrieved, or rank was null/0, or Elo calculation was null
       if (performance === null) {
+        wasFallbackUsed = true;
         console.log(`[Incremental Calc] Using approximate fallback performance calculation for contest ${contestId}`);
         const contestSolves = cfData.submissions.filter(sub => 
           sub.contestId === contestId &&
@@ -1350,7 +1365,8 @@ async function getAnalysisData(handle, forceRefresh = false, calculatePerformanc
         performance,
         participantType: contestInfo.type,
         ratingUpdateTimeSeconds: time,
-        isDateTaken: contestInfo.type === 'VIRTUAL' ? true : undefined
+        isDateTaken: contestInfo.type === 'VIRTUAL' ? true : undefined,
+        wasFallbackUsed: wasFallbackUsed
       };
       finalPerformancesMap.set(contestId, perfObj);
       calculatedMap.set(contestId, perfObj);

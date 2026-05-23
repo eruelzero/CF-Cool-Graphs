@@ -743,7 +743,7 @@ function renderTag15Chart(rollingTags) {
     '#3b82f6', // blue
     '#10b981', // emerald
     '#f59e0b', // amber
-    '#ef4444', // red
+    '#d32f2f', // red
     '#8b5cf6', // violet
     '#ec4899', // pink
     '#06b6d4', // cyan
@@ -1013,7 +1013,8 @@ function renderPerformanceChart(performances) {
       x: p.ratingUpdateTimeSeconds * 1000,
       y: p.performance,
       contestName: p.contestName,
-      rank: p.rank
+      rank: p.rank,
+      wasFallbackUsed: p.wasFallbackUsed
     }));
     
   const virtualData = performances
@@ -1022,7 +1023,8 @@ function renderPerformanceChart(performances) {
       x: p.ratingUpdateTimeSeconds * 1000,
       y: p.performance,
       contestName: p.contestName,
-      rank: p.rank
+      rank: p.rank,
+      wasFallbackUsed: p.wasFallbackUsed
     }));
     
   const ctx = canvas.getContext('2d');
@@ -1036,9 +1038,11 @@ function renderPerformanceChart(performances) {
       borderColor: '#8b5cf6',
       backgroundColor: 'rgba(139, 92, 246, 0.1)',
       borderWidth: 2.5,
-      pointRadius: 3,
-      pointHoverRadius: 5,
-      pointBackgroundColor: '#8b5cf6',
+      pointStyle: 'circle',
+      pointRadius: 3.5,
+      pointHoverRadius: 5.5,
+      pointBackgroundColor: (ctx) => (ctx.raw && ctx.raw.wasFallbackUsed ? '#64748b' : '#8b5cf6'),
+      pointBorderColor: (ctx) => (ctx.raw && ctx.raw.wasFallbackUsed ? '#64748b' : '#8b5cf6'),
       fill: true,
       tension: 0
     });
@@ -1053,9 +1057,11 @@ function renderPerformanceChart(performances) {
       backgroundColor: 'transparent',
       borderWidth: 2,
       borderDash: [6, 6],
-      pointRadius: 3,
-      pointHoverRadius: 5,
-      pointBackgroundColor: 'rgba(139, 92, 246, 0.5)',
+      pointStyle: 'circle',
+      pointRadius: 3.5,
+      pointHoverRadius: 5.5,
+      pointBackgroundColor: (ctx) => (ctx.raw && ctx.raw.wasFallbackUsed ? '#64748b' : 'rgba(139, 92, 246, 0.5)'),
+      pointBorderColor: (ctx) => (ctx.raw && ctx.raw.wasFallbackUsed ? '#64748b' : 'rgba(139, 92, 246, 0.5)'),
       fill: false,
       tension: 0
     });
@@ -1121,7 +1127,9 @@ function renderPerformanceChart(performances) {
                 `Rank: ${raw.rank}`,
                 `Performance: ${raw.y}`
               ];
-              if (isVirtual) {
+              if (raw.wasFallbackUsed) {
+                lines.push('(Approximate Fallback)');
+              } else if (isVirtual) {
                 lines.push('(Estimated value)');
               }
               return lines;
@@ -1285,7 +1293,7 @@ function renderAttemptsChart(verdictsByRating) {
       labels: labels,
       datasets: [
         { label: 'AC', data: acData, backgroundColor: '#10b981', stack: 'verdict' },
-        { label: 'WA', data: waData, backgroundColor: '#ef4444', stack: 'verdict' },
+        { label: 'WA', data: waData, backgroundColor: '#d32f2f', stack: 'verdict' },
         { label: 'TLE', data: tleData, backgroundColor: '#f59e0b', stack: 'verdict' },
         { label: 'MLE', data: mleData, backgroundColor: '#a78bfa', stack: 'verdict' },
         { label: 'Other', data: otherData, backgroundColor: '#64748b', stack: 'verdict' }
@@ -1417,7 +1425,7 @@ function renderTagsErrorChart(tagsError) {
       labels: labels,
       datasets: [
         { label: 'AC', data: acData, backgroundColor: '#10b981', stack: 'verdict' },
-        { label: 'WA', data: waData, backgroundColor: '#ef4444', stack: 'verdict' },
+        { label: 'WA', data: waData, backgroundColor: '#d32f2f', stack: 'verdict' },
         { label: 'TLE', data: tleData, backgroundColor: '#f59e0b', stack: 'verdict' },
         { label: 'MLE', data: mleData, backgroundColor: '#a78bfa', stack: 'verdict' },
         { label: 'Other', data: otherData, backgroundColor: '#64748b', stack: 'verdict' }
@@ -1655,14 +1663,14 @@ function renderTagWeaknessChart(tagWeakness) {
   });
 
   const backgroundColors = data.map(d => {
-    if (d.x > 0 && d.y < 50) return 'rgba(239, 68, 68, 0.65)';  // Red
+    if (d.x > 0 && d.y < 50) return 'rgba(211, 47, 47, 0.65)';  // Red
     if (d.x > 0 && d.y >= 50) return 'rgba(59, 130, 246, 0.65)'; // Blue
     if (d.x <= 0 && d.y < 50) return 'rgba(245, 158, 11, 0.65)'; // Orange
     return 'rgba(16, 185, 129, 0.65)';                          // Green
   });
 
   const borderColors = data.map(d => {
-    if (d.x > 0 && d.y < 50) return '#ef4444';
+    if (d.x > 0 && d.y < 50) return '#d32f2f';
     if (d.x > 0 && d.y >= 50) return '#3b82f6';
     if (d.x <= 0 && d.y < 50) return '#f59e0b';
     return '#10b981';
